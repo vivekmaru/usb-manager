@@ -1,0 +1,32 @@
+# USB Manager Rules Configuration
+# Copy this to ~/.config/usb-manager/rules.yaml
+
+rules:
+  # Camera photos (DCIM folder from cameras/phones)
+  - match: "DCIM/**/*.{jpg,jpeg,png,heic,raw,cr2,nef,arw}"
+    destination: "~/Photos/Camera"
+    enabled: true
+
+  # Videos
+  - match: "**/*.{mp4,mov,avi,mkv,webm}"
+    destination: "~/Videos/USB-Import"
+    enabled: true
+
+  # Documents
+  - match: "**/*.{pdf,doc,docx,xls,xlsx,ppt,pptx}"
+    destination: "~/Documents/USB-Import"
+    enabled: true
+
+  # Music
+  - match: "**/*.{mp3,flac,wav,aac,ogg}"
+    destination: "~/Music/USB-Import"
+    enabled: false  # disabled by default
+
+  # Markdown
+  - match: "**/*.{md}"
+    destination: "~/Documents/Markdown-Notes"
+    enabled: false  # disabled by default
+defaults:
+  # Where to copy files that don't match any rule
+  # Set to null to skip unmatched files
+  unmatchedDestination: null
