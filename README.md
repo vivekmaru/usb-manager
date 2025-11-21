@@ -10,6 +10,7 @@ A cross-platform (Linux/macOS) application that detects USB drives and provides 
 - **Multi-Select**: Click to select files/folders for batch copying
 - **Rule-Based Matching**: Configure glob patterns to auto-suggest destinations
 - **Real-Time Progress**: SSE-powered copy progress with file-by-file updates
+- **Dark Mode**: Supabase-inspired theme with light/dark toggle
 
 ## Quick Start
 
