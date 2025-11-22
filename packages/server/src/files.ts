@@ -1,6 +1,6 @@
 import { createReadStream, createWriteStream, existsSync, mkdirSync } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { basename, dirname, extname, join, relative } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type {
   CopyProgress,
@@ -8,25 +8,32 @@ import type {
   FileEntry,
   FileWithMatch,
 } from '@usb-manager/shared';
-import { loadRules, matchFile } from './rules.js';
+import { isExcluded, loadRules, matchFile } from './rules.js';
 
 export async function scanDirectory(
   dirPath: string,
-  basePath: string = dirPath
+  basePath: string = dirPath,
+  exclusions?: string[]
 ): Promise<FileEntry[]> {
   const entries: FileEntry[] = [];
+
+  // Load exclusions from config if not provided
+  const excludePatterns = exclusions ?? loadRules().exclusions ?? [];
 
   try {
     const items = await readdir(dirPath, { withFileTypes: true });
 
     for (const item of items) {
-      // Skip hidden files and system directories
-      if (item.name.startsWith('.')) continue;
-      if (item.name === 'System Volume Information') continue;
-      if (item.name === '$RECYCLE.BIN') continue;
-
       const fullPath = join(dirPath, item.name);
       const relativePath = relative(basePath, fullPath);
+
+      // Check exclusion patterns
+      if (isExcluded(relativePath, item.name, excludePatterns)) {
+        continue;
+      }
+
+      // Also skip common system items not in exclusion list
+      if (item.name === '$RECYCLE.BIN') continue;
 
       try {
         const stats = await stat(fullPath);
@@ -41,7 +48,7 @@ export async function scanDirectory(
         };
 
         if (item.isDirectory()) {
-          entry.children = await scanDirectory(fullPath, basePath);
+          entry.children = await scanDirectory(fullPath, basePath, excludePatterns);
         }
 
         entries.push(entry);
@@ -102,11 +109,28 @@ export async function copyFile(
   await pipeline(readStream, writeStream);
 }
 
+function getUniqueDestPath(destPath: string): string {
+  // Generate a unique path by adding a suffix like "_1", "_2", etc.
+  const ext = extname(destPath);
+  const base = basename(destPath, ext);
+  const dir = dirname(destPath);
+  let counter = 1;
+  let newPath = destPath;
+
+  while (existsSync(newPath)) {
+    newPath = join(dir, `${base}_${counter}${ext}`);
+    counter++;
+  }
+
+  return newPath;
+}
+
 export async function* executeCopy(
   request: CopyRequest
 ): AsyncGenerator<CopyProgress> {
   const id = crypto.randomUUID();
   const totalFiles = request.files.length;
+  const onDuplicate = request.onDuplicate ?? 'skip';
   let totalBytes = 0;
 
   // Calculate total bytes
@@ -124,6 +148,7 @@ export async function* executeCopy(
     status: 'pending',
     totalFiles,
     copiedFiles: 0,
+    skippedFiles: 0,
     totalBytes,
     copiedBytes: 0,
     currentFile: null,
@@ -137,7 +162,31 @@ export async function* executeCopy(
     yield { ...progress };
 
     try {
-      await copyFile(file.sourcePath, file.destinationPath);
+      let destPath = file.destinationPath;
+      const destExists = existsSync(destPath);
+
+      if (destExists) {
+        switch (onDuplicate) {
+          case 'skip':
+            // Skip this file
+            const sourceStats = await stat(file.sourcePath);
+            progress.copiedBytes += sourceStats.size;
+            progress.skippedFiles += 1;
+            yield { ...progress };
+            continue;
+
+          case 'rename':
+            // Generate unique filename
+            destPath = getUniqueDestPath(destPath);
+            break;
+
+          case 'overwrite':
+            // Just proceed with copy, will overwrite
+            break;
+        }
+      }
+
+      await copyFile(file.sourcePath, destPath);
 
       const stats = await stat(file.sourcePath);
       progress.copiedBytes += stats.size;

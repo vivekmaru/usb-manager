@@ -16,6 +16,8 @@ A cross-platform (Linux/macOS) application that detects USB drives and provides 
   - Live preview showing matched files count for each pattern
   - Drag-and-drop to reorder rule priority
   - Import/export rules as YAML
+  - Exclusion patterns to ignore system files (.DS_Store, Thumbs.db, etc.)
+- **Duplicate Detection**: Skip, overwrite, or rename files that already exist
 - **Real-Time Progress**: SSE-powered copy progress with file-by-file updates
 - **Dark Mode**: Supabase-inspired theme with light/dark toggle
 

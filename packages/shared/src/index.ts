@@ -35,6 +35,7 @@ export interface RulesConfig {
   defaults: {
     unmatchedDestination: string | null;
   };
+  exclusions?: string[]; // glob patterns to always ignore (e.g., '.DS_Store', '**/__MACOSX/**')
 }
 
 export interface MatchedRule {
@@ -43,8 +44,11 @@ export interface MatchedRule {
 }
 
 // Copy operation types
+export type DuplicateAction = 'skip' | 'overwrite' | 'rename';
+
 export interface CopyRequest {
   files: CopyFileRequest[];
+  onDuplicate?: DuplicateAction; // default: 'skip'
 }
 
 export interface CopyFileRequest {
@@ -52,11 +56,21 @@ export interface CopyFileRequest {
   destinationPath: string;
 }
 
+export interface DuplicateInfo {
+  sourcePath: string;
+  destinationPath: string;
+  sourceSize: number;
+  destSize: number;
+  sourceModified: Date;
+  destModified: Date;
+}
+
 export interface CopyProgress {
   id: string;
   status: 'pending' | 'copying' | 'completed' | 'error';
   totalFiles: number;
   copiedFiles: number;
+  skippedFiles: number; // duplicates that were skipped
   totalBytes: number;
   copiedBytes: number;
   currentFile: string | null;

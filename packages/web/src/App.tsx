@@ -28,7 +28,7 @@ import {
 import { cn, formatBytes } from './lib/utils';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Settings } from './pages/Settings';
-import type { CopyProgress, FileEntry, FileWithMatch } from '@usb-manager/shared';
+import type { CopyProgress, DuplicateAction, FileEntry, FileWithMatch } from '@usb-manager/shared';
 
 type Page = 'main' | 'settings';
 type ViewMode = 'auto' | 'manual';
@@ -45,6 +45,7 @@ export default function App() {
     null
   );
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null);
+  const [duplicateAction, setDuplicateAction] = useState<DuplicateAction>('skip');
 
   const usbQuery = useQuery({
     queryKey: ['usb'],
@@ -180,6 +181,7 @@ export default function App() {
         sourcePath: f.path,
         destinationPath: `${destination}/${f.name}`,
       })),
+      onDuplicate: duplicateAction,
     };
 
     try {
@@ -205,7 +207,7 @@ export default function App() {
     if (files.length === 0) return;
 
     try {
-      for await (const progress of executeCopy({ files })) {
+      for await (const progress of executeCopy({ files, onDuplicate: duplicateAction })) {
         setCopyProgress(progress);
       }
     } catch (error) {
@@ -285,10 +287,10 @@ export default function App() {
           <div className="flex items-center justify-between text-sm">
             <span>
               {copyProgress.status === 'completed'
-                ? 'Copy complete'
+                ? `Copy complete${copyProgress.skippedFiles > 0 ? ` (${copyProgress.skippedFiles} skipped)` : ''}`
                 : copyProgress.status === 'error'
                   ? 'Copy failed'
-                  : `Copying ${copyProgress.copiedFiles}/${copyProgress.totalFiles}...`}
+                  : `Copying ${copyProgress.copiedFiles}/${copyProgress.totalFiles}...${copyProgress.skippedFiles > 0 ? ` (${copyProgress.skippedFiles} skipped)` : ''}`}
             </span>
             {copyProgress.status === 'completed' && (
               <button
@@ -310,7 +312,7 @@ export default function App() {
                     : 'bg-primary'
               )}
               style={{
-                width: `${(copyProgress.copiedFiles / copyProgress.totalFiles) * 100}%`,
+                width: `${((copyProgress.copiedFiles + copyProgress.skippedFiles) / copyProgress.totalFiles) * 100}%`,
               }}
             />
           </div>
@@ -365,8 +367,22 @@ export default function App() {
                 ))}
               </div>
 
+              {/* Duplicate handling */}
+              <div className="mt-6 flex items-center justify-center gap-2 text-sm">
+                <span className="text-muted-foreground">If file exists:</span>
+                <select
+                  value={duplicateAction}
+                  onChange={(e) => setDuplicateAction(e.target.value as DuplicateAction)}
+                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                >
+                  <option value="skip">Skip</option>
+                  <option value="overwrite">Overwrite</option>
+                  <option value="rename">Rename (add suffix)</option>
+                </select>
+              </div>
+
               {/* Actions */}
-              <div className="mt-6 flex items-center justify-center gap-3">
+              <div className="mt-4 flex items-center justify-center gap-3">
                 <button
                   onClick={() => setViewMode('manual')}
                   className="flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm hover:bg-accent"

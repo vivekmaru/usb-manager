@@ -26,3 +26,14 @@ defaults:
   # Where to copy files that don't match any rule
   # Set to null to skip unmatched files
   unmatchedDestination: null
+
+# Files/folders to always ignore (glob patterns)
+exclusions:
+  - ".DS_Store"
+  - "Thumbs.db"
+  - "desktop.ini"
+  - "**/__MACOSX/**"
+  - "**/.Spotlight-V100/**"
+  - "**/.Trashes/**"
+  - "**/.fseventsd/**"
+  - "**/System Volume Information/**"

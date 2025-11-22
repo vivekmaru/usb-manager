@@ -17,6 +17,7 @@ const ConfigSchema = z.object({
   defaults: z.object({
     unmatchedDestination: z.string().nullable(),
   }),
+  exclusions: z.array(z.string()).optional().default([]),
 });
 
 function getDefaultConfigPath(): string {
@@ -115,4 +116,24 @@ export function getDestinationPath(
   // Keep the filename but put it in the destination directory
   const fileName = relativePath.split('/').pop() ?? relativePath;
   return join(destinationDir, fileName);
+}
+
+export function isExcluded(
+  relativePath: string,
+  fileName: string,
+  exclusions: string[]
+): boolean {
+  if (exclusions.length === 0) return false;
+
+  for (const pattern of exclusions) {
+    const isMatch = picomatch(pattern, {
+      nocase: true,
+      dot: true, // match dotfiles like .DS_Store
+    });
+    // Check both filename and full path
+    if (isMatch(fileName) || isMatch(relativePath)) {
+      return true;
+    }
+  }
+  return false;
 }

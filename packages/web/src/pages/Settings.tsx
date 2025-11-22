@@ -29,6 +29,7 @@ export function Settings({ onBack }: SettingsProps) {
   const [newRule, setNewRule] = useState<CopyRule | null>(null);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [newExclusion, setNewExclusion] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rulesQuery = useQuery({
@@ -44,6 +45,7 @@ export function Settings({ onBack }: SettingsProps) {
   });
 
   const rules = rulesQuery.data?.rules ?? [];
+  const exclusions = rulesQuery.data?.exclusions ?? [];
 
   const handleToggleEnabled = (index: number) => {
     if (!rulesQuery.data) return;
@@ -95,6 +97,20 @@ export function Settings({ onBack }: SettingsProps) {
     }
     setDragIndex(null);
     setDragOverIndex(null);
+  };
+
+  // Exclusion handlers
+  const handleAddExclusion = () => {
+    if (!rulesQuery.data || !newExclusion.trim()) return;
+    const updated = [...exclusions, newExclusion.trim()];
+    updateMutation.mutate({ ...rulesQuery.data, exclusions: updated });
+    setNewExclusion('');
+  };
+
+  const handleRemoveExclusion = (index: number) => {
+    if (!rulesQuery.data) return;
+    const updated = exclusions.filter((_, i) => i !== index);
+    updateMutation.mutate({ ...rulesQuery.data, exclusions: updated });
   };
 
   // Export rules as YAML
@@ -245,6 +261,57 @@ export function Settings({ onBack }: SettingsProps) {
                     Add a rule to automatically match files to destinations
                   </p>
                 </div>
+              )}
+            </div>
+          </section>
+
+          {/* Exclusions Section */}
+          <section className="mt-8">
+            <div className="mb-4">
+              <h2 className="text-lg font-medium">Exclusions</h2>
+              <p className="text-sm text-muted-foreground">
+                Files and folders matching these patterns will always be ignored
+              </p>
+            </div>
+
+            {/* Add exclusion input */}
+            <div className="mb-4 flex gap-2">
+              <input
+                type="text"
+                value={newExclusion}
+                onChange={(e) => setNewExclusion(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddExclusion()}
+                placeholder="e.g., .DS_Store or **/__MACOSX/**"
+                className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={handleAddExclusion}
+                disabled={!newExclusion.trim()}
+                className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                Add
+              </button>
+            </div>
+
+            {/* Exclusions list */}
+            <div className="flex flex-wrap gap-2">
+              {exclusions.map((pattern, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-1 rounded-md border bg-card px-2 py-1 text-sm"
+                >
+                  <code className="text-muted-foreground">{pattern}</code>
+                  <button
+                    onClick={() => handleRemoveExclusion(index)}
+                    className="ml-1 rounded p-0.5 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {exclusions.length === 0 && (
+                <p className="text-sm text-muted-foreground">No exclusions configured</p>
               )}
             </div>
           </section>
@@ -509,6 +576,12 @@ function generateYaml(config: RulesConfig): string {
   }
   yaml += '\ndefaults:\n';
   yaml += `  unmatchedDestination: ${config.defaults.unmatchedDestination ?? 'null'}\n`;
+  if (config.exclusions && config.exclusions.length > 0) {
+    yaml += '\nexclusions:\n';
+    for (const pattern of config.exclusions) {
+      yaml += `  - "${pattern}"\n`;
+    }
+  }
   return yaml;
 }
 
@@ -517,8 +590,9 @@ function parseYaml(content: string): RulesConfig | null {
   try {
     const lines = content.split('\n');
     const rules: CopyRule[] = [];
+    const exclusions: string[] = [];
     let currentRule: Partial<CopyRule> = {};
-    let inRules = false;
+    let section: 'rules' | 'defaults' | 'exclusions' | null = null;
     let unmatchedDestination: string | null = null;
 
     for (const line of lines) {
@@ -526,16 +600,23 @@ function parseYaml(content: string): RulesConfig | null {
       if (trimmed.startsWith('#') || trimmed === '') continue;
 
       if (trimmed === 'rules:') {
-        inRules = true;
+        section = 'rules';
         continue;
       }
-
       if (trimmed === 'defaults:') {
-        inRules = false;
+        if (currentRule.match) {
+          rules.push(currentRule as CopyRule);
+          currentRule = {};
+        }
+        section = 'defaults';
+        continue;
+      }
+      if (trimmed === 'exclusions:') {
+        section = 'exclusions';
         continue;
       }
 
-      if (inRules) {
+      if (section === 'rules') {
         if (trimmed.startsWith('- match:')) {
           if (currentRule.match) {
             rules.push(currentRule as CopyRule);
@@ -546,10 +627,14 @@ function parseYaml(content: string): RulesConfig | null {
         } else if (trimmed.startsWith('enabled:')) {
           currentRule.enabled = trimmed.includes('true');
         }
-      } else {
+      } else if (section === 'defaults') {
         if (trimmed.startsWith('unmatchedDestination:')) {
           const val = extractValue(trimmed.replace('unmatchedDestination:', ''));
           unmatchedDestination = val === 'null' ? null : val;
+        }
+      } else if (section === 'exclusions') {
+        if (trimmed.startsWith('-')) {
+          exclusions.push(extractValue(trimmed.slice(1)));
         }
       }
     }
@@ -558,7 +643,7 @@ function parseYaml(content: string): RulesConfig | null {
       rules.push(currentRule as CopyRule);
     }
 
-    return { rules, defaults: { unmatchedDestination } };
+    return { rules, defaults: { unmatchedDestination }, exclusions };
   } catch {
     return null;
   }
