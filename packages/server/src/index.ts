@@ -298,6 +298,47 @@ fastify.get<{ Querystring: { path: string } }>(
   }
 );
 
+// Eject USB drive
+fastify.post('/api/eject', async (): Promise<ApiResponse<{ success: boolean }>> => {
+  try {
+    const { exec } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const execAsync = promisify(exec);
+
+    // Try to unmount the USB drive
+    const platform = process.platform;
+    let command: string;
+
+    if (platform === 'darwin') {
+      // macOS
+      command = `diskutil unmount "${USB_MOUNT_PATH}"`;
+    } else if (platform === 'linux') {
+      // Linux
+      command = `umount "${USB_MOUNT_PATH}"`;
+    } else {
+      return {
+        success: false,
+        error: { message: 'Unsupported platform for eject', code: 'UNSUPPORTED_PLATFORM' },
+      };
+    }
+
+    await execAsync(command);
+
+    return {
+      success: true,
+      data: { success: true },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Failed to eject USB',
+        code: 'EJECT_ERROR',
+      },
+    };
+  }
+});
+
 // Health check
 fastify.get('/api/health', async () => ({
   status: 'ok',

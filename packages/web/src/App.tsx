@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   HardDrive,
@@ -16,6 +16,15 @@ import {
   Sparkles,
   FileStack,
   X,
+  Unplug,
+  Search,
+  FileImage,
+  FileVideo,
+  FileAudio,
+  FileText,
+  FileCode,
+  FileSpreadsheet,
+  FileArchive,
 } from 'lucide-react';
 import {
   getTree,
@@ -24,6 +33,7 @@ import {
   browsePath,
   executeCopy,
   getFiles,
+  ejectUsb,
 } from './lib/api';
 import { cn, formatBytes } from './lib/utils';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -32,6 +42,49 @@ import type { CopyProgress, DuplicateAction, FileEntry, FileWithMatch } from '@u
 
 type Page = 'main' | 'settings';
 type ViewMode = 'auto' | 'manual';
+
+// Get file icon based on extension
+function getFileIcon(fileName: string) {
+  const ext = fileName.toLowerCase().split('.').pop() || '';
+
+  // Image files
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp', 'heic', 'heif', 'raw', 'cr2', 'nef'].includes(ext)) {
+    return FileImage;
+  }
+
+  // Video files
+  if (['mp4', 'mov', 'avi', 'mkv', 'webm', 'flv', 'wmv', 'm4v', 'mpg', 'mpeg'].includes(ext)) {
+    return FileVideo;
+  }
+
+  // Audio files
+  if (['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg', 'wma', 'aiff'].includes(ext)) {
+    return FileAudio;
+  }
+
+  // Document files
+  if (['pdf', 'doc', 'docx', 'txt', 'rtf', 'odt', 'pages'].includes(ext)) {
+    return FileText;
+  }
+
+  // Code files
+  if (['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'css', 'html', 'json', 'xml', 'yaml', 'yml', 'sh', 'bash', 'go', 'rs', 'php', 'rb', 'swift', 'kt'].includes(ext)) {
+    return FileCode;
+  }
+
+  // Spreadsheet files
+  if (['xls', 'xlsx', 'csv', 'numbers', 'ods'].includes(ext)) {
+    return FileSpreadsheet;
+  }
+
+  // Archive files
+  if (['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz', 'dmg', 'iso'].includes(ext)) {
+    return FileArchive;
+  }
+
+  // Default file icon
+  return File;
+}
 
 export default function App() {
   const [page, setPage] = useState<Page>('main');
@@ -46,6 +99,10 @@ export default function App() {
   );
   const [copyProgress, setCopyProgress] = useState<CopyProgress | null>(null);
   const [duplicateAction, setDuplicateAction] = useState<DuplicateAction>('skip');
+  const [isEjecting, setIsEjecting] = useState(false);
+  const [ejectMessage, setEjectMessage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [autoSelectedPaths, setAutoSelectedPaths] = useState<Set<string>>(new Set());
 
   const usbQuery = useQuery({
     queryKey: ['usb'],
@@ -100,13 +157,67 @@ export default function App() {
     return count;
   }, [matchedByDestination]);
 
-  const totalMatchedSize = useMemo(() => {
-    let size = 0;
-    for (const files of matchedByDestination.values()) {
-      for (const f of files) size += f.size;
+  // Auto-select all matched files by default
+  useEffect(() => {
+    if (filesQuery.data && viewMode === 'auto') {
+      const paths = new Set<string>();
+      for (const file of filesQuery.data) {
+        if (file.matchedRule) {
+          paths.add(file.path);
+        }
+      }
+      setAutoSelectedPaths(paths);
     }
-    return size;
-  }, [matchedByDestination]);
+  }, [filesQuery.data, viewMode]);
+
+  // Count selected files in auto mode
+  const selectedAutoFiles = useMemo(() => {
+    const selected: FileWithMatch[] = [];
+    for (const file of filesQuery.data || []) {
+      if (file.matchedRule && autoSelectedPaths.has(file.path)) {
+        selected.push(file);
+      }
+    }
+    return selected;
+  }, [filesQuery.data, autoSelectedPaths]);
+
+  const selectedAutoFilesCount = selectedAutoFiles.length;
+  const selectedAutoFilesSize = useMemo(() => {
+    return selectedAutoFiles.reduce((sum, f) => sum + f.size, 0);
+  }, [selectedAutoFiles]);
+
+  // Filter tree based on search query
+  const filteredTree = useMemo(() => {
+    if (!searchQuery.trim() || !treeQuery.data) return treeQuery.data;
+
+    const query = searchQuery.toLowerCase();
+
+    const filterEntry = (entry: FileEntry): FileEntry | null => {
+      const nameMatches = entry.name.toLowerCase().includes(query);
+
+      if (entry.isDirectory && entry.children) {
+        const filteredChildren = entry.children
+          .map(filterEntry)
+          .filter((e: FileEntry | null): e is FileEntry => e !== null);
+
+        // Include directory if it matches or has matching children
+        if (nameMatches || filteredChildren.length > 0) {
+          return {
+            ...entry,
+            children: filteredChildren,
+          };
+        }
+      } else if (nameMatches) {
+        return entry;
+      }
+
+      return null;
+    };
+
+    return treeQuery.data
+      .map(filterEntry)
+      .filter((e: FileEntry | null): e is FileEntry => e !== null);
+  }, [treeQuery.data, searchQuery]);
 
   if (page === 'settings') {
     return <Settings onBack={() => setPage('main')} />;
@@ -193,14 +304,14 @@ export default function App() {
     }
   };
 
-  // Auto-copy all matched files to their destinations
+  // Auto-copy selected matched files to their destinations
   const handleAutoCopy = async () => {
     const files: { sourcePath: string; destinationPath: string }[] = [];
-    for (const [dest, matchedFiles] of matchedByDestination) {
-      for (const f of matchedFiles) {
+    for (const file of selectedAutoFiles) {
+      if (file.matchedRule) {
         files.push({
-          sourcePath: f.path,
-          destinationPath: `${dest}/${f.name}`,
+          sourcePath: file.path,
+          destinationPath: `${file.matchedRule.destination}/${file.name}`,
         });
       }
     }
@@ -212,6 +323,47 @@ export default function App() {
       }
     } catch (error) {
       console.error('Auto-copy failed:', error);
+    }
+  };
+
+  const toggleAutoFileSelection = (filePath: string) => {
+    setAutoSelectedPaths((prev) => {
+      const next = new Set(prev);
+      if (next.has(filePath)) {
+        next.delete(filePath);
+      } else {
+        next.add(filePath);
+      }
+      return next;
+    });
+  };
+
+  const selectAllAutoFiles = () => {
+    const paths = new Set<string>();
+    for (const file of filesQuery.data || []) {
+      if (file.matchedRule) {
+        paths.add(file.path);
+      }
+    }
+    setAutoSelectedPaths(paths);
+  };
+
+  const deselectAllAutoFiles = () => {
+    setAutoSelectedPaths(new Set());
+  };
+
+  const handleEject = async () => {
+    setIsEjecting(true);
+    setEjectMessage(null);
+    try {
+      await ejectUsb();
+      setEjectMessage('USB safely ejected. You can now remove the drive.');
+    } catch (error) {
+      setEjectMessage(
+        `Failed to eject: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    } finally {
+      setIsEjecting(false);
     }
   };
 
@@ -293,12 +445,22 @@ export default function App() {
                   : `Copying ${copyProgress.copiedFiles}/${copyProgress.totalFiles}...${copyProgress.skippedFiles > 0 ? ` (${copyProgress.skippedFiles} skipped)` : ''}`}
             </span>
             {copyProgress.status === 'completed' && (
-              <button
-                onClick={() => setCopyProgress(null)}
-                className="text-primary hover:underline"
-              >
-                Dismiss
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleEject}
+                  disabled={isEjecting}
+                  className="flex items-center gap-1.5 rounded-md px-3 py-1 text-sm text-primary hover:underline disabled:opacity-50"
+                >
+                  <Unplug className="h-4 w-4" />
+                  {isEjecting ? 'Ejecting...' : 'Eject USB'}
+                </button>
+                <button
+                  onClick={() => setCopyProgress(null)}
+                  className="text-primary hover:underline"
+                >
+                  Dismiss
+                </button>
+              </div>
             )}
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -319,6 +481,23 @@ export default function App() {
         </div>
       )}
 
+      {/* Eject Message */}
+      {ejectMessage && (
+        <div className="border-b bg-card px-6 py-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className={ejectMessage.includes('Failed') ? 'text-destructive' : 'text-primary'}>
+              {ejectMessage}
+            </span>
+            <button
+              onClick={() => setEjectMessage(null)}
+              className="text-muted-foreground hover:underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main content - Auto or Manual mode */}
       {viewMode === 'auto' && totalMatchedFiles > 0 ? (
         /* Auto-match confirmation panel */
@@ -329,11 +508,32 @@ export default function App() {
               <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-6 text-center">
                 <Sparkles className="mx-auto mb-3 h-10 w-10 text-primary" />
                 <h2 className="text-xl font-semibold">
-                  {totalMatchedFiles} files ready to copy
+                  {selectedAutoFilesCount} of {totalMatchedFiles} files selected
                 </h2>
                 <p className="mt-1 text-muted-foreground">
-                  {formatBytes(totalMatchedSize)} total • {matchedByDestination.size} destination{matchedByDestination.size !== 1 ? 's' : ''}
+                  {formatBytes(selectedAutoFilesSize)} • {matchedByDestination.size} destination{matchedByDestination.size !== 1 ? 's' : ''}
                 </p>
+                {selectedAutoFilesCount !== totalMatchedFiles && (
+                  <div className="mt-3 flex justify-center gap-2">
+                    <button
+                      onClick={selectAllAutoFiles}
+                      className="text-sm text-primary hover:underline"
+                    >
+                      Select all
+                    </button>
+                    {selectedAutoFilesCount > 0 && (
+                      <>
+                        <span className="text-muted-foreground">•</span>
+                        <button
+                          onClick={deselectAllAutoFiles}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Deselect all
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Grouped by destination */}
@@ -350,13 +550,31 @@ export default function App() {
                       </div>
                     </div>
                     <div className="max-h-40 overflow-auto p-2">
-                      {files.slice(0, 10).map((f) => (
-                        <div key={f.path} className="flex items-center gap-2 px-2 py-1 text-sm">
-                          <File className="h-4 w-4 text-muted-foreground" />
-                          <span className="flex-1 truncate">{f.name}</span>
-                          <span className="text-xs text-muted-foreground">{formatBytes(f.size)}</span>
-                        </div>
-                      ))}
+                      {files.slice(0, 10).map((f) => {
+                        const IconComponent = getFileIcon(f.name);
+                        const isSelected = autoSelectedPaths.has(f.path);
+                        return (
+                          <div
+                            key={f.path}
+                            className="flex items-center gap-2 px-2 py-1 text-sm hover:bg-accent rounded cursor-pointer"
+                            onClick={() => toggleAutoFileSelection(f.path)}
+                          >
+                            <button
+                              className={cn(
+                                'flex h-4 w-4 items-center justify-center rounded border flex-shrink-0',
+                                isSelected
+                                  ? 'border-primary bg-primary'
+                                  : 'border-muted-foreground/30'
+                              )}
+                            >
+                              {isSelected && <Check className="h-3 w-3 text-primary-foreground" />}
+                            </button>
+                            <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="flex-1 truncate">{f.name}</span>
+                            <span className="text-xs text-muted-foreground flex-shrink-0">{formatBytes(f.size)}</span>
+                          </div>
+                        );
+                      })}
                       {files.length > 10 && (
                         <p className="px-2 py-1 text-sm text-muted-foreground">
                           ...and {files.length - 10} more
@@ -392,11 +610,13 @@ export default function App() {
                 </button>
                 <button
                   onClick={handleAutoCopy}
-                  disabled={copyProgress?.status === 'copying'}
+                  disabled={copyProgress?.status === 'copying' || selectedAutoFilesCount === 0}
                   className="flex items-center gap-2 rounded-lg bg-primary px-6 py-2.5 font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
                 >
                   <Copy className="h-4 w-4" />
-                  Copy All
+                  {selectedAutoFilesCount === totalMatchedFiles
+                    ? 'Copy All'
+                    : `Copy ${selectedAutoFilesCount} Selected`}
                   <ArrowRight className="h-4 w-4" />
                 </button>
               </div>
@@ -438,18 +658,46 @@ export default function App() {
             <div className="border-b bg-muted px-4 py-2 text-sm font-medium text-muted-foreground">
               USB Drive
             </div>
-            <div className="flex-1 overflow-auto p-2">
-              {treeQuery.data?.map((entry) => (
-                <TreeNode
-                  key={entry.path}
-                  entry={entry}
-                  depth={0}
-                  expanded={expandedFolders}
-                  selected={selectedPaths}
-                  onToggleExpand={toggleFolder}
-                  onToggleSelect={toggleSelect}
+            {/* Search bar */}
+            <div className="border-b bg-card px-3 py-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search files..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-md border bg-background py-1.5 pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                 />
-              ))}
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-2">
+              {filteredTree?.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-sm text-muted-foreground">
+                  <Search className="mb-2 h-8 w-8" />
+                  <p>No files match your search</p>
+                </div>
+              ) : (
+                filteredTree?.map((entry) => (
+                  <TreeNode
+                    key={entry.path}
+                    entry={entry}
+                    depth={0}
+                    expanded={expandedFolders}
+                    selected={selectedPaths}
+                    onToggleExpand={toggleFolder}
+                    onToggleSelect={toggleSelect}
+                  />
+                ))
+              )}
             </div>
           </div>
 
@@ -597,11 +845,11 @@ function TreeNode({
 
   const allChildrenSelected =
     entry.isDirectory && entry.children
-      ? entry.children.every((c) => selected.has(c.path))
+      ? entry.children.every((c: FileEntry) => selected.has(c.path))
       : false;
   const someChildrenSelected =
     entry.isDirectory && entry.children
-      ? entry.children.some((c) => selected.has(c.path))
+      ? entry.children.some((c: FileEntry) => selected.has(c.path))
       : false;
 
   return (
@@ -659,7 +907,10 @@ function TreeNode({
             <Folder className="ml-2 h-4 w-4 text-primary" />
           )
         ) : (
-          <File className="ml-2 h-4 w-4 text-muted-foreground" />
+          (() => {
+            const IconComponent = getFileIcon(entry.name);
+            return <IconComponent className="ml-2 h-4 w-4 text-muted-foreground" />;
+          })()
         )}
 
         {/* Name */}
@@ -676,7 +927,7 @@ function TreeNode({
       {/* Children */}
       {entry.isDirectory && isExpanded && entry.children && (
         <div>
-          {entry.children.map((child) => (
+          {entry.children.map((child: FileEntry) => (
             <TreeNode
               key={child.path}
               entry={child}

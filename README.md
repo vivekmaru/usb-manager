@@ -7,9 +7,12 @@ A cross-platform (Linux/macOS) application that detects USB drives and provides 
 - **USB Detection**: Automatically detects when USB drives are mounted
 - **Auto-Copy Mode**: Files matching rules are shown with one-click confirmation
   - Files grouped by destination for easy review
+  - **Selective Auto-Copy**: Uncheck specific files before confirming
   - Switch to Manual mode for fine-grained control
 - **Two-Panel Interface**: Browse USB contents (left) and select destination (right)
 - **Folder Tree View**: Navigate USB drive with expandable folder hierarchy
+- **Search & Filter**: Quickly find files by name or extension in the file tree
+- **File Type Icons**: Visual distinction for images, videos, documents, code, and more
 - **Multi-Select**: Click to select files/folders for batch copying
 - **Rule-Based Matching**: Configure glob patterns to auto-suggest destinations
 - **Settings UI**: Add, edit, delete copy rules directly in the app
@@ -18,6 +21,7 @@ A cross-platform (Linux/macOS) application that detects USB drives and provides 
   - Import/export rules as YAML
   - Exclusion patterns to ignore system files (.DS_Store, Thumbs.db, etc.)
 - **Duplicate Detection**: Skip, overwrite, or rename files that already exist
+- **Safe Eject**: Safely unmount USB drive after copy completes
 - **Real-Time Progress**: SSE-powered copy progress with file-by-file updates
 - **Dark Mode**: Supabase-inspired theme with light/dark toggle
 
