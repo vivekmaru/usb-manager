@@ -51,7 +51,7 @@ pnpm --filter @usb-manager/watcher dev   # Start USB watcher
 
 ## Configuration
 
-Rules are stored in `~/.config/usb-manager/rules.yaml`:
+Rules are stored in `~/.config/usb-manager/rules.yaml` (created from `config/rules.yaml` on first run):
 
 ```yaml
 rules:
@@ -60,17 +60,22 @@ rules:
     enabled: true
 defaults:
   unmatchedDestination: null             # null = skip unmatched files
+exclusions:                              # files to always ignore
+  - ".DS_Store"
+  - "Thumbs.db"
+  - "**/__MACOSX/**"
 ```
 
-See `config/rules.example.yaml` for full example.
+See `config/rules.yaml` for full default configuration.
 
 ## Key Files
 
 - `packages/server/src/index.ts` - Fastify server with all API endpoints
-- `packages/server/src/rules.ts` - Rule engine (picomatch globs, YAML parsing)
-- `packages/server/src/files.ts` - File scanning and copy operations
-- `packages/watcher/src/index.ts` - USB mount detection
-- `packages/web/src/App.tsx` - Main UI component (two-panel layout)
+- `packages/server/src/rules.ts` - Rule engine (picomatch globs, YAML parsing, exclusions)
+- `packages/server/src/files.ts` - File scanning, copy operations, duplicate detection
+- `packages/watcher/src/index.ts` - USB mount detection (requires native drivelist module)
+- `packages/web/src/App.tsx` - Main UI (Auto/Manual modes, two-panel layout)
+- `packages/web/src/pages/Settings.tsx` - Settings UI (rules, exclusions, import/export)
 - `packages/web/src/lib/api.ts` - API client functions
 
 ## API Endpoints
@@ -80,11 +85,23 @@ See `config/rules.example.yaml` for full example.
 - `GET /api/files` - Flat file list with rule matches
 - `GET /api/rules` - Current copy rules
 - `PUT /api/rules` - Update copy rules
+- `GET /api/test-pattern?pattern=...` - Test glob pattern against current USB files
 - `GET /api/local-dirs` - Common local directories
 - `GET /api/browse?path=...` - Browse local directory
-- `POST /api/copy` - Execute copy (SSE stream)
+- `POST /api/copy` - Execute copy (SSE stream, supports `onDuplicate`: skip/overwrite/rename)
 
 ## Environment Variables
 
 - `USB_MOUNT_PATH` - Path to mounted USB drive (set by watcher)
 - `PORT` - Server port (default: 3847)
+
+## Native Module Notes
+
+The `drivelist` package (used by watcher) requires native bindings. If you get binding errors:
+
+```bash
+cd node_modules/.pnpm/drivelist@*/node_modules/drivelist
+npm run rebuild
+```
+
+This compiles the native addon for your Node version and platform.

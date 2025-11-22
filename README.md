@@ -60,9 +60,13 @@ rules:
     enabled: true
 defaults:
   unmatchedDestination: null  # null = skip unmatched files
+exclusions:
+  - ".DS_Store"
+  - "Thumbs.db"
+  - "**/__MACOSX/**"
 ```
 
-See `config/rules.example.yaml` for more examples.
+See `config/rules.yaml` for more examples.
 
 ## Architecture
 
