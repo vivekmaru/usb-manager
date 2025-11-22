@@ -22,10 +22,6 @@ rules:
     destination: "~/Music/USB-Import"
     enabled: false  # disabled by default
 
-  # Markdown
-  - match: "**/*.{md}"
-    destination: "~/Documents/Markdown-Notes"
-    enabled: false  # disabled by default
 defaults:
   # Where to copy files that don't match any rule
   # Set to null to skip unmatched files

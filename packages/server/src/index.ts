@@ -17,6 +17,7 @@ import type {
 import {
   applyRulesToFiles,
   executeCopy,
+  flattenFiles,
   scanDirectory,
 } from './files.js';
 import { loadRules, saveRules } from './rules.js';
@@ -161,6 +162,43 @@ fastify.post<{ Body: CopyRequest }>(
     }
 
     reply.raw.end();
+  }
+);
+
+// Test pattern against current USB files
+fastify.get<{ Querystring: { pattern: string } }>(
+  '/api/test-pattern',
+  async (request): Promise<ApiResponse<{ count: number; samples: string[] }>> => {
+    try {
+      const { pattern } = request.query;
+      if (!pattern) {
+        return {
+          success: false,
+          error: { message: 'Pattern required', code: 'PATTERN_REQUIRED' },
+        };
+      }
+
+      const entries = await scanDirectory(USB_MOUNT_PATH);
+      const files = flattenFiles(entries);
+      const picomatch = (await import('picomatch')).default;
+      const isMatch = picomatch(pattern, { nocase: true, dot: false });
+
+      const matched = files.filter((f) => isMatch(f.relativePath));
+      const samples = matched.slice(0, 5).map((f) => f.relativePath);
+
+      return {
+        success: true,
+        data: { count: matched.length, samples },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'TEST_ERROR',
+        },
+      };
+    }
   }
 );
 

@@ -19,28 +19,28 @@ const ConfigSchema = z.object({
   }),
 });
 
-const DEFAULT_CONFIG: RulesConfig = {
-  rules: [
-    {
-      match: 'DCIM/**/*.{jpg,jpeg,png,heic,raw,cr2,nef,arw}',
-      destination: '~/Photos/Camera',
-      enabled: true,
-    },
-    {
-      match: '**/*.{mp4,mov,avi,mkv}',
-      destination: '~/Videos/USB-Import',
-      enabled: true,
-    },
-    {
-      match: '**/*.pdf',
-      destination: '~/Documents/USB-Import',
-      enabled: true,
-    },
-  ],
-  defaults: {
-    unmatchedDestination: null,
-  },
-};
+function getDefaultConfigPath(): string {
+  // config/rules.yaml relative to packages/server/dist (compiled output)
+  return join(import.meta.dirname, '../../../config/rules.yaml');
+}
+
+function loadDefaultConfig(): RulesConfig {
+  const defaultPath = getDefaultConfigPath();
+  if (existsSync(defaultPath)) {
+    try {
+      const content = readFileSync(defaultPath, 'utf-8');
+      const parsed = parse(content);
+      return ConfigSchema.parse(parsed);
+    } catch (error) {
+      console.error('[rules] Error loading default config:', error);
+    }
+  }
+  // Fallback if config/rules.yaml doesn't exist
+  return {
+    rules: [],
+    defaults: { unmatchedDestination: null },
+  };
+}
 
 function getConfigPath(): string {
   const configDir = join(homedir(), '.config', 'usb-manager');
@@ -58,12 +58,13 @@ export function loadRules(): RulesConfig {
   const configPath = getConfigPath();
 
   if (!existsSync(configPath)) {
-    // Create default config
+    // Create default config from config/rules.yaml
+    const defaultConfig = loadDefaultConfig();
     const configDir = dirname(configPath);
     mkdirSync(configDir, { recursive: true });
-    writeFileSync(configPath, stringify(DEFAULT_CONFIG), 'utf-8');
+    writeFileSync(configPath, stringify(defaultConfig), 'utf-8');
     console.log(`[rules] Created default config at ${configPath}`);
-    return DEFAULT_CONFIG;
+    return defaultConfig;
   }
 
   try {
@@ -73,7 +74,7 @@ export function loadRules(): RulesConfig {
     return validated;
   } catch (error) {
     console.error('[rules] Error loading config, using defaults:', error);
-    return DEFAULT_CONFIG;
+    return loadDefaultConfig();
   }
 }
 

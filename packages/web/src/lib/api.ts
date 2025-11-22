@@ -52,6 +52,14 @@ export async function browsePath(path: string): Promise<LocalDirectory[]> {
   return fetchApi<LocalDirectory[]>(`/browse?path=${encodeURIComponent(path)}`);
 }
 
+export async function testPattern(
+  pattern: string
+): Promise<{ count: number; samples: string[] }> {
+  return fetchApi<{ count: number; samples: string[] }>(
+    `/test-pattern?pattern=${encodeURIComponent(pattern)}`
+  );
+}
+
 export async function getRules(): Promise<RulesConfig> {
   return fetchApi<RulesConfig>('/rules');
 }
