@@ -7,8 +7,14 @@ import type {
   CopyRequest,
   FileEntry,
   FileWithMatch,
+  CopyHistoryEntry,
+  CopyHistoryFile,
 } from '@usb-manager/shared';
 import { isExcluded, loadRules, matchFile } from './rules.js';
+import { addHistoryEntry } from './history.js';
+import { calculateFileHash, isDuplicate } from './duplicates.js';
+import { getOrganizedPath } from './organization.js';
+import { executeScheduledActions } from './scheduled-actions.js';
 
 export async function scanDirectory(
   dirPath: string,
@@ -126,12 +132,21 @@ function getUniqueDestPath(destPath: string): string {
 }
 
 export async function* executeCopy(
-  request: CopyRequest
+  request: CopyRequest,
+  usbDevice?: string,
+  usbLabel?: string | null,
+  mountPath?: string
 ): AsyncGenerator<CopyProgress> {
   const id = crypto.randomUUID();
   const totalFiles = request.files.length;
   const onDuplicate = request.onDuplicate ?? 'skip';
+  const config = loadRules();
+  const features = config.features || {};
+  const startTime = Date.now();
   let totalBytes = 0;
+
+  // Track history if feature is enabled
+  const historyFiles: CopyHistoryFile[] = [];
 
   // Calculate total bytes
   for (const file of request.files) {
@@ -163,20 +178,64 @@ export async function* executeCopy(
 
     try {
       let destPath = file.destinationPath;
-      const destExists = existsSync(destPath);
+      const sourceStats = await stat(file.sourcePath);
 
-      if (destExists) {
+      // Apply smart organization if enabled
+      if (features.smartOrganization && config.smartOrganization) {
+        const baseDestination = dirname(destPath);
+        destPath = await getOrganizedPath(
+          file.sourcePath,
+          baseDestination,
+          config.smartOrganization
+        );
+      }
+
+      const destExists = existsSync(destPath);
+      let isContentDuplicate = false;
+      let fileHash: string | undefined;
+
+      // Check for content-based duplicates if feature is enabled
+      if (features.contentDuplicates && destExists) {
+        isContentDuplicate = await isDuplicate(file.sourcePath, destPath);
+        if (isContentDuplicate && onDuplicate === 'skip') {
+          progress.copiedBytes += sourceStats.size;
+          progress.skippedFiles += 1;
+
+          if (features.copyHistory) {
+            fileHash = await calculateFileHash(file.sourcePath);
+            historyFiles.push({
+              sourcePath: file.sourcePath,
+              destinationPath: destPath,
+              size: sourceStats.size,
+              status: 'skipped',
+              hash: fileHash,
+            });
+          }
+
+          yield { ...progress };
+          continue;
+        }
+      }
+
+      if (destExists && !isContentDuplicate) {
         switch (onDuplicate) {
           case 'skip':
-            // Skip this file
-            const sourceStats = await stat(file.sourcePath);
             progress.copiedBytes += sourceStats.size;
             progress.skippedFiles += 1;
+
+            if (features.copyHistory) {
+              historyFiles.push({
+                sourcePath: file.sourcePath,
+                destinationPath: destPath,
+                size: sourceStats.size,
+                status: 'skipped',
+              });
+            }
+
             yield { ...progress };
             continue;
 
           case 'rename':
-            // Generate unique filename
             destPath = getUniqueDestPath(destPath);
             break;
 
@@ -188,16 +247,64 @@ export async function* executeCopy(
 
       await copyFile(file.sourcePath, destPath);
 
-      const stats = await stat(file.sourcePath);
-      progress.copiedBytes += stats.size;
+      // Calculate hash if copy history is enabled
+      if (features.copyHistory && features.contentDuplicates) {
+        fileHash = await calculateFileHash(file.sourcePath);
+      }
+
+      progress.copiedBytes += sourceStats.size;
       progress.copiedFiles += 1;
+
+      if (features.copyHistory) {
+        historyFiles.push({
+          sourcePath: file.sourcePath,
+          destinationPath: destPath,
+          size: sourceStats.size,
+          status: 'copied',
+          hash: fileHash,
+        });
+      }
 
       yield { ...progress };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      if (features.copyHistory) {
+        const sourceStats = await stat(file.sourcePath).catch(() => null);
+        historyFiles.push({
+          sourcePath: file.sourcePath,
+          destinationPath: file.destinationPath,
+          size: sourceStats?.size || 0,
+          status: 'error',
+          error: errorMessage,
+        });
+      }
+
       progress.status = 'error';
-      progress.error =
-        error instanceof Error ? error.message : 'Unknown error';
+      progress.error = errorMessage;
       yield { ...progress };
+
+      // Save history entry even on error
+      if (features.copyHistory && usbDevice) {
+        const duration = Date.now() - startTime;
+        const historyEntry: CopyHistoryEntry = {
+          id,
+          timestamp: new Date(),
+          usbDevice,
+          usbLabel: usbLabel || null,
+          totalFiles,
+          copiedFiles: progress.copiedFiles,
+          skippedFiles: progress.skippedFiles,
+          totalBytes,
+          copiedBytes: progress.copiedBytes,
+          duration,
+          status: 'error',
+          error: errorMessage,
+          files: historyFiles,
+        };
+        addHistoryEntry(historyEntry);
+      }
+
       return;
     }
   }
@@ -205,4 +312,45 @@ export async function* executeCopy(
   progress.status = 'completed';
   progress.currentFile = null;
   yield { ...progress };
+
+  // Save history entry on success
+  if (features.copyHistory && usbDevice) {
+    const duration = Date.now() - startTime;
+    const historyEntry: CopyHistoryEntry = {
+      id,
+      timestamp: new Date(),
+      usbDevice,
+      usbLabel: usbLabel || null,
+      totalFiles,
+      copiedFiles: progress.copiedFiles,
+      skippedFiles: progress.skippedFiles,
+      totalBytes,
+      copiedBytes: progress.copiedBytes,
+      duration,
+      status: 'completed',
+      files: historyFiles,
+    };
+    addHistoryEntry(historyEntry);
+  }
+
+  // Execute scheduled actions if enabled
+  if (features.scheduledActions && config.scheduledActions) {
+    try {
+      const copiedSourcePaths = historyFiles
+        .filter(f => f.status === 'copied')
+        .map(f => f.sourcePath);
+
+      const result = await executeScheduledActions(
+        config.scheduledActions,
+        copiedSourcePaths,
+        mountPath
+      );
+
+      if (result.errors.length > 0) {
+        console.warn('[copy] Scheduled actions had errors:', result.errors);
+      }
+    } catch (error) {
+      console.error('[copy] Failed to execute scheduled actions:', error);
+    }
+  }
 }

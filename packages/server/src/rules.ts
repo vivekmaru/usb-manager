@@ -12,12 +12,47 @@ const RuleSchema = z.object({
   enabled: z.boolean().optional().default(true),
 });
 
+const FeaturesSchema = z.object({
+  copyHistory: z.boolean().optional().default(false),
+  smartOrganization: z.boolean().optional().default(false),
+  contentDuplicates: z.boolean().optional().default(false),
+  scheduledActions: z.boolean().optional().default(false),
+});
+
+const SmartOrganizationSchema = z.object({
+  pattern: z.string().optional().default('{year}/{month}/{day}/{name}'),
+  useMetadata: z.boolean().optional().default(true),
+});
+
+const ScheduledActionsSchema = z.object({
+  autoDeleteAfterCopy: z.boolean().optional().default(false),
+  autoEjectAfterCopy: z.boolean().optional().default(false),
+  cleanupOldFiles: z.boolean().optional().default(false),
+  cleanupDays: z.number().optional().default(30),
+});
+
 const ConfigSchema = z.object({
   rules: z.array(RuleSchema),
   defaults: z.object({
     unmatchedDestination: z.string().nullable(),
   }),
   exclusions: z.array(z.string()).optional().default([]),
+  features: FeaturesSchema.optional().default({
+    copyHistory: false,
+    smartOrganization: false,
+    contentDuplicates: false,
+    scheduledActions: false,
+  }),
+  smartOrganization: SmartOrganizationSchema.optional().default({
+    pattern: '{year}/{month}/{day}/{name}',
+    useMetadata: true,
+  }),
+  scheduledActions: ScheduledActionsSchema.optional().default({
+    autoDeleteAfterCopy: false,
+    autoEjectAfterCopy: false,
+    cleanupOldFiles: false,
+    cleanupDays: 30,
+  }),
 });
 
 function getDefaultConfigPath(): string {
