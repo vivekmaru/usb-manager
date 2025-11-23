@@ -13,6 +13,8 @@ import type {
   LocalDirectory,
   RulesConfig,
   UsbDrive,
+  CopyHistoryEntry,
+  DuplicateGroup,
 } from '@usb-manager/shared';
 import {
   applyRulesToFiles,
@@ -21,6 +23,13 @@ import {
   scanDirectory,
 } from './files.js';
 import { loadRules, saveRules } from './rules.js';
+import {
+  loadHistory,
+  getHistoryStats,
+  clearHistory,
+  deleteHistoryEntry,
+} from './history.js';
+import { findDuplicates } from './duplicates.js';
 
 const USB_MOUNT_PATH = process.env.USB_MOUNT_PATH ?? '/media';
 const PORT = Number(process.env.PORT) || 3847;
@@ -149,7 +158,15 @@ fastify.post<{ Body: CopyRequest }>(
     reply.raw.setHeader('Connection', 'keep-alive');
 
     try {
-      for await (const progress of executeCopy(request.body)) {
+      // Get USB info for history tracking
+      const label = USB_MOUNT_PATH.split('/').pop() ?? 'USB Drive';
+
+      for await (const progress of executeCopy(
+        request.body,
+        USB_MOUNT_PATH,
+        label,
+        USB_MOUNT_PATH
+      )) {
         const event = `data: ${JSON.stringify(progress)}\n\n`;
         reply.raw.write(event);
       }
@@ -338,6 +355,126 @@ fastify.post('/api/eject', async (): Promise<ApiResponse<{ success: boolean }>> 
     };
   }
 });
+
+// Get copy history
+fastify.get(
+  '/api/history',
+  async (): Promise<ApiResponse<CopyHistoryEntry[]>> => {
+    try {
+      const history = loadHistory();
+      return {
+        success: true,
+        data: history,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'HISTORY_ERROR',
+        },
+      };
+    }
+  }
+);
+
+// Get history statistics
+fastify.get('/api/history/stats', async (): Promise<ApiResponse<any>> => {
+  try {
+    const stats = getHistoryStats();
+    return {
+      success: true,
+      data: stats,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        code: 'HISTORY_STATS_ERROR',
+      },
+    };
+  }
+});
+
+// Clear history
+fastify.delete(
+  '/api/history',
+  async (): Promise<ApiResponse<{ success: boolean }>> => {
+    try {
+      clearHistory();
+      return {
+        success: true,
+        data: { success: true },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'HISTORY_CLEAR_ERROR',
+        },
+      };
+    }
+  }
+);
+
+// Delete history entry
+fastify.delete<{ Params: { id: string } }>(
+  '/api/history/:id',
+  async (request): Promise<ApiResponse<{ success: boolean }>> => {
+    try {
+      const deleted = deleteHistoryEntry(request.params.id);
+      if (!deleted) {
+        return {
+          success: false,
+          error: {
+            message: 'History entry not found',
+            code: 'HISTORY_NOT_FOUND',
+          },
+        };
+      }
+      return {
+        success: true,
+        data: { success: true },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'HISTORY_DELETE_ERROR',
+        },
+      };
+    }
+  }
+);
+
+// Find duplicates in current USB files
+fastify.get(
+  '/api/duplicates',
+  async (): Promise<ApiResponse<DuplicateGroup[]>> => {
+    try {
+      const entries = await scanDirectory(USB_MOUNT_PATH);
+      const files = flattenFiles(entries);
+      const filePaths = files.map((f) => f.path);
+      const duplicates = await findDuplicates(filePaths);
+
+      return {
+        success: true,
+        data: duplicates,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'DUPLICATES_ERROR',
+        },
+      };
+    }
+  }
+);
 
 // Health check
 fastify.get('/api/health', async () => ({

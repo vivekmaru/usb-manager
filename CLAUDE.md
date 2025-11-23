@@ -70,11 +70,35 @@ exclusions:                              # files to always ignore
 
 See `config/rules.yaml` for full default configuration.
 
+### Experimental Features
+
+The app includes experimental features behind feature flags (disabled by default):
+
+```yaml
+features:
+  copyHistory: false          # Track copy operations with stats
+  smartOrganization: false    # Auto-organize by date/metadata
+  contentDuplicates: false    # Hash-based duplicate detection
+  scheduledActions: false     # Auto-delete/eject after copy
+```
+
+**Feature Modules:**
+- `history.ts` - Stores copy operations in `~/.config/usb-manager/history.json` (max 1000 entries)
+- `duplicates.ts` - SHA-256 hash calculation and comparison
+- `organization.ts` - Pattern-based file organization with variables like `{year}`, `{month}`, `{day}`
+- `scheduled-actions.ts` - Post-copy automation (delete source files, auto-eject USB)
+
+See `IDEAS.md` for full feature documentation and future plans.
+
 ## Key Files
 
-- `packages/server/src/index.ts` - Fastify server with all API endpoints (includes eject endpoint)
-- `packages/server/src/rules.ts` - Rule engine (picomatch globs, YAML parsing, exclusions)
-- `packages/server/src/files.ts` - File scanning, copy operations, duplicate detection
+- `packages/server/src/index.ts` - Fastify server with all API endpoints (includes eject, history, duplicates)
+- `packages/server/src/rules.ts` - Rule engine (picomatch globs, YAML parsing, exclusions, feature flags)
+- `packages/server/src/files.ts` - File scanning, copy operations, feature integration
+- `packages/server/src/history.ts` - Copy history tracking and storage (experimental)
+- `packages/server/src/duplicates.ts` - SHA-256 hash-based duplicate detection (experimental)
+- `packages/server/src/organization.ts` - Smart file organization by date/metadata (experimental)
+- `packages/server/src/scheduled-actions.ts` - Auto-delete, auto-eject, cleanup (experimental)
 - `packages/watcher/src/index.ts` - USB mount detection (requires native drivelist module)
 - `packages/web/src/App.tsx` - Main UI (Auto/Manual modes, search/filter, file type icons, selective auto-copy)
 - `packages/web/src/pages/Settings.tsx` - Settings UI (rules, exclusions, import/export)
@@ -82,6 +106,7 @@ See `config/rules.yaml` for full default configuration.
 
 ## API Endpoints
 
+**Core Endpoints:**
 - `GET /api/usb` - USB drive info
 - `GET /api/tree` - Folder tree with hierarchy
 - `GET /api/files` - Flat file list with rule matches
@@ -92,6 +117,13 @@ See `config/rules.yaml` for full default configuration.
 - `GET /api/browse?path=...` - Browse local directory
 - `POST /api/copy` - Execute copy (SSE stream, supports `onDuplicate`: skip/overwrite/rename)
 - `POST /api/eject` - Safely unmount USB drive (uses `umount` on Linux, `diskutil unmount` on macOS)
+
+**Experimental Endpoints (require feature flags):**
+- `GET /api/history` - Get all copy history entries (requires `features.copyHistory`)
+- `GET /api/history/stats` - Get copy statistics (requires `features.copyHistory`)
+- `DELETE /api/history` - Clear all history (requires `features.copyHistory`)
+- `DELETE /api/history/:id` - Delete specific history entry (requires `features.copyHistory`)
+- `GET /api/duplicates` - Find content-based duplicates on USB (requires `features.contentDuplicates`)
 
 ## UI Features
 

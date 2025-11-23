@@ -30,12 +30,34 @@ export interface CopyRule {
   enabled?: boolean;
 }
 
+export interface Features {
+  copyHistory?: boolean;
+  smartOrganization?: boolean;
+  contentDuplicates?: boolean;
+  scheduledActions?: boolean;
+}
+
+export interface SmartOrganizationConfig {
+  pattern?: string; // e.g., '{year}/{month}/{day}/{name}'
+  useMetadata?: boolean;
+}
+
+export interface ScheduledActionsConfig {
+  autoDeleteAfterCopy?: boolean;
+  autoEjectAfterCopy?: boolean;
+  cleanupOldFiles?: boolean;
+  cleanupDays?: number;
+}
+
 export interface RulesConfig {
   rules: CopyRule[];
   defaults: {
     unmatchedDestination: string | null;
   };
   exclusions?: string[]; // glob patterns to always ignore (e.g., '.DS_Store', '**/__MACOSX/**')
+  features?: Features;
+  smartOrganization?: SmartOrganizationConfig;
+  scheduledActions?: ScheduledActionsConfig;
 }
 
 export interface MatchedRule {
@@ -100,4 +122,44 @@ export interface LocalDirectory {
   name: string;
   path: string;
   isCommon: boolean; // true for ~/Photos, ~/Documents, etc.
+}
+
+// Copy History types
+export interface CopyHistoryEntry {
+  id: string;
+  timestamp: Date;
+  usbDevice: string;
+  usbLabel: string | null;
+  totalFiles: number;
+  copiedFiles: number;
+  skippedFiles: number;
+  totalBytes: number;
+  copiedBytes: number;
+  duration: number; // milliseconds
+  status: 'completed' | 'error' | 'cancelled';
+  error?: string;
+  files: CopyHistoryFile[];
+}
+
+export interface CopyHistoryFile {
+  sourcePath: string;
+  destinationPath: string;
+  size: number;
+  status: 'copied' | 'skipped' | 'error';
+  error?: string;
+  hash?: string; // SHA-256 hash if content duplicates feature is enabled
+}
+
+// Content-based duplicate types
+export interface FileHash {
+  path: string;
+  hash: string;
+  size: number;
+  modifiedAt: Date;
+}
+
+export interface DuplicateGroup {
+  hash: string;
+  files: FileHash[];
+  totalSize: number;
 }

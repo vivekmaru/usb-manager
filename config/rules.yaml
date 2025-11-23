@@ -37,3 +37,42 @@ exclusions:
   - "**/.Trashes/**"
   - "**/.fseventsd/**"
   - "**/System Volume Information/**"
+
+# Experimental features (disabled by default)
+features:
+  # Copy History & Activity Log
+  # Tracks all copy operations with timestamps and statistics
+  copyHistory: false
+
+  # Smart Auto-Organization
+  # Auto-organize files by date/metadata during copy
+  smartOrganization: false
+
+  # Content-Based Duplicate Detection
+  # Hash-based comparison to detect identical files
+  contentDuplicates: false
+
+  # Scheduled Actions
+  # Auto-delete from USB after copy, auto-eject, etc.
+  scheduledActions: false
+
+# Smart Organization Settings (only used if features.smartOrganization is enabled)
+smartOrganization:
+  # Pattern for organizing files: {year}/{month}/{day}/{name}
+  # Available variables: {year}, {month}, {day}, {name}, {ext}, {type}
+  pattern: "{year}/{month}/{day}/{name}"
+
+  # Organize by metadata (EXIF for photos, etc.)
+  useMetadata: true
+
+# Scheduled Actions Settings (only used if features.scheduledActions is enabled)
+scheduledActions:
+  # Auto-delete from USB after successful copy
+  autoDeleteAfterCopy: false
+
+  # Auto-eject USB after copy completion
+  autoEjectAfterCopy: false
+
+  # Cleanup old files from USB (files older than X days)
+  cleanupOldFiles: false
+  cleanupDays: 30
