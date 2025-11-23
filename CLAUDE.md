@@ -18,6 +18,8 @@ USB Manager is a cross-platform (Linux/macOS) application that:
 - Detects USB drive connections via filesystem watching
 - Copies USB contents to local folders using rule-based pattern matching
 - Provides a web interface for previewing matched files and confirming copies
+- Features auto/manual modes with search/filter, file type icons, and selective file selection
+- Supports safe USB ejection after copy completion
 
 ## Architecture
 
@@ -70,13 +72,13 @@ See `config/rules.yaml` for full default configuration.
 
 ## Key Files
 
-- `packages/server/src/index.ts` - Fastify server with all API endpoints
+- `packages/server/src/index.ts` - Fastify server with all API endpoints (includes eject endpoint)
 - `packages/server/src/rules.ts` - Rule engine (picomatch globs, YAML parsing, exclusions)
 - `packages/server/src/files.ts` - File scanning, copy operations, duplicate detection
 - `packages/watcher/src/index.ts` - USB mount detection (requires native drivelist module)
-- `packages/web/src/App.tsx` - Main UI (Auto/Manual modes, two-panel layout)
+- `packages/web/src/App.tsx` - Main UI (Auto/Manual modes, search/filter, file type icons, selective auto-copy)
 - `packages/web/src/pages/Settings.tsx` - Settings UI (rules, exclusions, import/export)
-- `packages/web/src/lib/api.ts` - API client functions
+- `packages/web/src/lib/api.ts` - API client functions (includes ejectUsb)
 
 ## API Endpoints
 
@@ -89,6 +91,32 @@ See `config/rules.yaml` for full default configuration.
 - `GET /api/local-dirs` - Common local directories
 - `GET /api/browse?path=...` - Browse local directory
 - `POST /api/copy` - Execute copy (SSE stream, supports `onDuplicate`: skip/overwrite/rename)
+- `POST /api/eject` - Safely unmount USB drive (uses `umount` on Linux, `diskutil unmount` on macOS)
+
+## UI Features
+
+**Auto Mode:**
+- Files matching rules are automatically selected with checkboxes
+- Users can uncheck specific files before copying (selective auto-copy)
+- "Select all" / "Deselect all" buttons for bulk operations
+- Files grouped by destination folder
+- Copy button shows count of selected files
+
+**Manual Mode:**
+- Two-panel layout: USB drive (left) and destination selector (right)
+- Search/filter input filters file tree in real-time by name or extension
+- File type icons provide visual distinction:
+  - Images: jpg, png, gif, heic, raw, etc.
+  - Videos: mp4, mov, avi, mkv, etc.
+  - Audio: mp3, wav, flac, etc.
+  - Documents: pdf, doc, txt, etc.
+  - Code: js, ts, py, java, etc.
+  - Spreadsheets: xls, xlsx, csv, etc.
+  - Archives: zip, rar, 7z, etc.
+
+**After Copy:**
+- "Eject USB" button appears when copy completes
+- Success/error messages with dismiss functionality
 
 ## Environment Variables
 

@@ -106,3 +106,9 @@ export async function* executeCopy(
     }
   }
 }
+
+export async function ejectUsb(): Promise<{ success: boolean }> {
+  return fetchApi<{ success: boolean }>('/eject', {
+    method: 'POST',
+  });
+}
