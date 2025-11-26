@@ -1,5 +1,5 @@
-# USB Manager Rules Configuration
-# Copy this to ~/.config/usb-manager/rules.yaml
+# USB Ingest Rules Configuration
+# Copy this to ~/.config/usb-ingest/rules.yaml
 
 rules:
   # Camera photos (DCIM folder from cameras/phones)

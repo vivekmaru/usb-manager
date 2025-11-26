@@ -7,7 +7,7 @@ import type {
   LocalDirectory,
   RulesConfig,
   UsbDrive,
-} from '@usb-manager/shared';
+} from '@usb-ingest/shared';
 
 const API_BASE = '/api';
 
