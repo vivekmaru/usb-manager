@@ -38,7 +38,7 @@ import {
 import { cn, formatBytes } from './lib/utils';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Settings } from './pages/Settings';
-import type { CopyProgress, DuplicateAction, FileEntry, FileWithMatch } from '@usb-manager/shared';
+import type { CopyProgress, DuplicateAction, FileEntry, FileWithMatch } from '@usb-ingest/shared';
 
 type Page = 'main' | 'settings';
 type ViewMode = 'auto' | 'manual';

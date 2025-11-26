@@ -1,5 +1,5 @@
 {
-  "name": "@usb-manager/watcher",
+  "name": "@usb-ingest/watcher",
   "version": "1.0.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,7 +13,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@usb-manager/shared": "workspace:*",
+    "@usb-ingest/shared": "workspace:*",
     "chokidar": "^4.0.0",
     "drivelist": "^12.0.0",
     "open": "^10.1.0"

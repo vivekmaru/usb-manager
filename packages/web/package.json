@@ -1,5 +1,5 @@
 {
-  "name": "@usb-manager/web",
+  "name": "@usb-ingest/web",
   "version": "1.0.0",
   "type": "module",
   "scripts": {
@@ -9,7 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@usb-manager/shared": "workspace:*",
+    "@usb-ingest/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
     "clsx": "^2.1.0",
     "lucide-react": "^0.460.0",

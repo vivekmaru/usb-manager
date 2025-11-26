@@ -7,7 +7,7 @@ import type {
   CopyRequest,
   FileEntry,
   FileWithMatch,
-} from '@usb-manager/shared';
+} from '@usb-ingest/shared';
 import { isExcluded, loadRules, matchFile } from './rules.js';
 
 export async function scanDirectory(

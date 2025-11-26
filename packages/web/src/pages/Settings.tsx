@@ -17,7 +17,7 @@ import {
 import { getRules, updateRules, getLocalDirs, testPattern } from '../lib/api';
 import { cn } from '../lib/utils';
 import { ThemeToggle } from '../components/ThemeToggle';
-import type { CopyRule, RulesConfig } from '@usb-manager/shared';
+import type { CopyRule, RulesConfig } from '@usb-ingest/shared';
 
 interface SettingsProps {
   onBack: () => void;
