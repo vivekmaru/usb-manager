@@ -1,6 +1,6 @@
-# USB Manager
+# USB Ingest
 
-A cross-platform (Linux/macOS) application that detects USB drives and provides a web interface to copy files to local destinations.
+A cross-platform (Linux/macOS) application that automatically ingests files from USB drives with rule-based pattern matching and a web interface for previewing and confirming transfers.
 
 ## Features
 
@@ -35,24 +35,24 @@ pnpm install
 pnpm build
 
 # Start the watcher (production mode - auto-launches on USB insert)
-pnpm --filter @usb-manager/watcher start
+pnpm --filter @usb-ingest/watcher start
 ```
 
 ### Development Mode
 
 ```bash
 # Terminal 1: Start server with a test folder
-USB_MOUNT_PATH=/path/to/test/folder pnpm --filter @usb-manager/server dev
+USB_MOUNT_PATH=/path/to/test/folder pnpm --filter @usb-ingest/server dev
 
 # Terminal 2: Start frontend dev server
-pnpm --filter @usb-manager/web dev
+pnpm --filter @usb-ingest/web dev
 
 # Open http://localhost:5173
 ```
 
 ## Configuration
 
-Copy rules are stored in `~/.config/usb-manager/rules.yaml`:
+Copy rules are stored in `~/.config/usb-ingest/rules.yaml`:
 
 ```yaml
 rules:

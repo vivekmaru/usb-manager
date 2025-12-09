@@ -14,7 +14,7 @@ Keep README.md concise and user-focused (quick start, features, config). Keep CL
 
 ## Project Overview
 
-USB Manager is a cross-platform (Linux/macOS) application that:
+USB Ingest is a cross-platform (Linux/macOS) application that:
 - Detects USB drive connections via filesystem watching
 - Copies USB contents to local folders using rule-based pattern matching
 - Provides a web interface for previewing matched files and confirming copies
@@ -46,14 +46,14 @@ pnpm type-check   # TypeScript check across all packages
 
 **Package-specific:**
 ```bash
-pnpm --filter @usb-manager/server dev    # Server only (port 3847)
-pnpm --filter @usb-manager/web dev       # Frontend only (port 5173, proxies to 3847)
-pnpm --filter @usb-manager/watcher dev   # Start USB watcher
+pnpm --filter @usb-ingest/server dev    # Server only (port 3847)
+pnpm --filter @usb-ingest/web dev       # Frontend only (port 5173, proxies to 3847)
+pnpm --filter @usb-ingest/watcher dev   # Start USB watcher
 ```
 
 ## Configuration
 
-Rules are stored in `~/.config/usb-manager/rules.yaml` (created from `config/rules.yaml` on first run):
+Rules are stored in `~/.config/usb-ingest/rules.yaml` (created from `config/rules.yaml` on first run):
 
 ```yaml
 rules:
