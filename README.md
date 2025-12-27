@@ -72,6 +72,27 @@ exclusions:
 
 See `config/rules.yaml` for more examples.
 
+### Experimental Features
+
+USB Manager includes experimental features behind feature flags. Enable them in your config file:
+
+```yaml
+features:
+  copyHistory: false          # Track all copy operations with stats
+  smartOrganization: false    # Auto-organize by date (e.g., 2025/01/23/)
+  contentDuplicates: false    # Hash-based duplicate detection
+  scheduledActions: false     # Auto-delete/eject after copy
+```
+
+**Available Experimental Features:**
+
+1. **Copy History** - Track all copy operations with timestamps, file counts, and statistics. Access via `/api/history`
+2. **Smart Organization** - Auto-organize files using patterns like `{year}/{month}/{day}/{name}` (configurable)
+3. **Content-Based Duplicates** - SHA-256 hash comparison to detect identical files even with different names
+4. **Scheduled Actions** - Auto-delete from USB after copy, auto-eject drive, scheduled cleanup
+
+See `IDEAS.md` for full documentation and future feature plans.
+
 ## Architecture
 
 ```
