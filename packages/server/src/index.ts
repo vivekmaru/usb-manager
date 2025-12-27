@@ -485,7 +485,7 @@ fastify.get('/api/health', async () => ({
 // Start server
 try {
   await fastify.listen({ port: PORT, host: '0.0.0.0' });
-  console.log(`[server] USB Manager server running on http://localhost:${PORT}`);
+  console.log(`[server] USB Ingest server running on http://localhost:${PORT}`);
   console.log(`[server] USB mount path: ${USB_MOUNT_PATH}`);
 } catch (err) {
   fastify.log.error(err);

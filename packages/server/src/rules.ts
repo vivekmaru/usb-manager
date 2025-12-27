@@ -4,7 +4,7 @@ import { dirname, join, resolve } from 'node:path';
 import picomatch from 'picomatch';
 import { parse, stringify } from 'yaml';
 import { z } from 'zod';
-import type { CopyRule, MatchedRule, RulesConfig } from '@usb-manager/shared';
+import type { CopyRule, MatchedRule, RulesConfig } from '@usb-ingest/shared';
 
 const RuleSchema = z.object({
   match: z.string(),
@@ -79,7 +79,7 @@ function loadDefaultConfig(): RulesConfig {
 }
 
 function getConfigPath(): string {
-  const configDir = join(homedir(), '.config', 'usb-manager');
+  const configDir = join(homedir(), '.config', 'usb-ingest');
   return join(configDir, 'rules.yaml');
 }
 
