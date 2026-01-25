@@ -16,7 +16,7 @@ importers:
       '@fastify/static':
         specifier: ^8.0.0
         version: 8.3.0
-      '@usb-manager/shared':
+      '@usb-ingest/shared':
         specifier: workspace:*
         version: link:../shared
       fastify:
@@ -53,7 +53,7 @@ importers:
 
   packages/watcher:
     dependencies:
-      '@usb-manager/shared':
+      '@usb-ingest/shared':
         specifier: workspace:*
         version: link:../shared
       chokidar:
@@ -81,7 +81,7 @@ importers:
       '@tanstack/react-query':
         specifier: ^5.62.0
         version: 5.90.10(react@19.2.0)
-      '@usb-manager/shared':
+      '@usb-ingest/shared':
         specifier: workspace:*
         version: link:../shared
       clsx:

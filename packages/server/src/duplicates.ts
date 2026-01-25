@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import type { DuplicateGroup, FileHash } from '@usb-manager/shared';
+import type { DuplicateGroup, FileHash } from '@usb-ingest/shared';
 
 export async function calculateFileHash(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {

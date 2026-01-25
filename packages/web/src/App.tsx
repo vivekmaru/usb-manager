@@ -25,6 +25,7 @@ import {
   FileCode,
   FileSpreadsheet,
   FileArchive,
+  Eye,
 } from 'lucide-react';
 import {
   getTree,
@@ -37,6 +38,7 @@ import {
 } from './lib/api';
 import { cn, formatBytes } from './lib/utils';
 import { ThemeToggle } from './components/ThemeToggle';
+import { FilePreview } from './components/FilePreview';
 import { Settings } from './pages/Settings';
 import type { CopyProgress, DuplicateAction, FileEntry, FileWithMatch } from '@usb-ingest/shared';
 
@@ -103,6 +105,7 @@ export default function App() {
   const [ejectMessage, setEjectMessage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [autoSelectedPaths, setAutoSelectedPaths] = useState<Set<string>>(new Set());
+  const [previewFile, setPreviewFile] = useState<FileEntry | null>(null);
 
   const usbQuery = useQuery({
     queryKey: ['usb'],
@@ -438,11 +441,27 @@ export default function App() {
         <div className="border-b bg-card px-6 py-3">
           <div className="flex items-center justify-between text-sm">
             <span>
-              {copyProgress.status === 'completed'
-                ? `Copy complete${copyProgress.skippedFiles > 0 ? ` (${copyProgress.skippedFiles} skipped)` : ''}`
-                : copyProgress.status === 'error'
-                  ? 'Copy failed'
-                  : `Copying ${copyProgress.copiedFiles}/${copyProgress.totalFiles}...${copyProgress.skippedFiles > 0 ? ` (${copyProgress.skippedFiles} skipped)` : ''}`}
+              {copyProgress.status === 'completed' ? (
+                <span>
+                  Copy complete
+                  {copyProgress.skippedFiles > 0 && ` (${copyProgress.skippedFiles} skipped)`}
+                  {copyProgress.failedVerificationFiles && copyProgress.failedVerificationFiles > 0 ? (
+                    <span className="ml-2 text-destructive font-medium">• {copyProgress.failedVerificationFiles} verification failed</span>
+                  ) : copyProgress.verifiedFiles && copyProgress.verifiedFiles > 0 ? (
+                    <span className="ml-2 text-primary">• {copyProgress.verifiedFiles} verified</span>
+                  ) : null}
+                </span>
+              ) : copyProgress.status === 'error' ? (
+                'Copy failed'
+              ) : (
+                <span>
+                  Copying {copyProgress.copiedFiles}/{copyProgress.totalFiles}...
+                  {copyProgress.skippedFiles > 0 && ` (${copyProgress.skippedFiles} skipped)`}
+                  {copyProgress.verifiedFiles && copyProgress.verifiedFiles > 0 && (
+                    <span className="ml-2 text-muted-foreground">• Verifying: {copyProgress.verifiedFiles}</span>
+                  )}
+                </span>
+              )}
             </span>
             {copyProgress.status === 'completed' && (
               <div className="flex items-center gap-2">
@@ -496,6 +515,11 @@ export default function App() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* File Preview Modal */}
+      {previewFile && (
+        <FilePreview file={previewFile} onClose={() => setPreviewFile(null)} />
       )}
 
       {/* Main content - Auto or Manual mode */}
@@ -556,7 +580,7 @@ export default function App() {
                         return (
                           <div
                             key={f.path}
-                            className="flex items-center gap-2 px-2 py-1 text-sm hover:bg-accent rounded cursor-pointer"
+                            className="group flex items-center gap-2 px-2 py-1 text-sm hover:bg-accent rounded cursor-pointer"
                             onClick={() => toggleAutoFileSelection(f.path)}
                           >
                             <button
@@ -571,6 +595,16 @@ export default function App() {
                             </button>
                             <IconComponent className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                             <span className="flex-1 truncate">{f.name}</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewFile(f);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground mr-2"
+                              title="Preview"
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                            </button>
                             <span className="text-xs text-muted-foreground flex-shrink-0">{formatBytes(f.size)}</span>
                           </div>
                         );
@@ -695,6 +729,7 @@ export default function App() {
                     selected={selectedPaths}
                     onToggleExpand={toggleFolder}
                     onToggleSelect={toggleSelect}
+                    onPreview={setPreviewFile}
                   />
                 ))
               )}
@@ -830,6 +865,7 @@ function TreeNode({
   selected,
   onToggleExpand,
   onToggleSelect,
+  onPreview,
 }: {
   entry: FileEntry;
   depth: number;
@@ -837,6 +873,7 @@ function TreeNode({
   selected: Set<string>;
   onToggleExpand: (path: string) => void;
   onToggleSelect: (entry: FileEntry) => void;
+  onPreview: (entry: FileEntry) => void;
 }) {
   const isExpanded = expanded.has(entry.path);
   const isSelected = selected.has(entry.path);
@@ -856,7 +893,7 @@ function TreeNode({
     <div>
       <div
         className={cn(
-          'flex items-center gap-1 rounded py-1 pr-2 hover:bg-accent',
+          'group flex items-center gap-1 rounded py-1 pr-2 hover:bg-accent',
           isSelected && 'bg-primary/20'
         )}
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
@@ -916,6 +953,20 @@ function TreeNode({
         {/* Name */}
         <span className="ml-2 flex-1 truncate text-sm">{entry.name}</span>
 
+        {/* Preview Button */}
+        {!entry.isDirectory && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onPreview(entry);
+            }}
+            className="ml-2 opacity-0 group-hover:opacity-100 p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground"
+            title="Preview"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </button>
+        )}
+
         {/* Size (files only) */}
         {!entry.isDirectory && (
           <span className="text-xs text-muted-foreground">
@@ -936,6 +987,7 @@ function TreeNode({
               selected={selected}
               onToggleExpand={onToggleExpand}
               onToggleSelect={onToggleSelect}
+              onPreview={onPreview}
             />
           ))}
         </div>

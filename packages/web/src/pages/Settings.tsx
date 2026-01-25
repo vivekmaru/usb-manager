@@ -13,11 +13,12 @@ import {
   Download,
   Upload,
   FileText,
+  ShieldCheck,
 } from 'lucide-react';
 import { getRules, updateRules, getLocalDirs, testPattern } from '../lib/api';
 import { cn } from '../lib/utils';
 import { ThemeToggle } from '../components/ThemeToggle';
-import type { CopyRule, RulesConfig } from '@usb-ingest/shared';
+import type { CopyRule, RulesConfig, Features } from '@usb-ingest/shared';
 
 interface SettingsProps {
   onBack: () => void;
@@ -46,6 +47,19 @@ export function Settings({ onBack }: SettingsProps) {
 
   const rules = rulesQuery.data?.rules ?? [];
   const exclusions = rulesQuery.data?.exclusions ?? [];
+  const features = rulesQuery.data?.features || {};
+
+  const handleToggleFeature = (feature: keyof Features) => {
+    if (!rulesQuery.data) return;
+    const currentFeatures = rulesQuery.data.features || {};
+    updateMutation.mutate({
+      ...rulesQuery.data,
+      features: {
+        ...currentFeatures,
+        [feature]: !currentFeatures[feature],
+      },
+    });
+  };
 
   const handleToggleEnabled = (index: number) => {
     if (!rulesQuery.data) return;
@@ -262,6 +276,46 @@ export function Settings({ onBack }: SettingsProps) {
                   </p>
                 </div>
               )}
+            </div>
+          </section>
+
+          {/* Features Section */}
+          <section className="mt-8">
+            <div className="mb-4">
+              <h2 className="text-lg font-medium">Features</h2>
+              <p className="text-sm text-muted-foreground">
+                Enable additional functionality
+              </p>
+            </div>
+
+            <div className="rounded-lg border bg-card p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium">Integrity Verification</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Verify file hashes after copy to ensure data integrity
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleToggleFeature('verifyIntegrity')}
+                  className={cn(
+                    'flex h-6 w-11 items-center rounded-full p-1 transition-colors',
+                    features.verifyIntegrity ? 'bg-primary' : 'bg-muted'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'h-4 w-4 rounded-full bg-white transition-transform',
+                      features.verifyIntegrity ? 'translate-x-5' : 'translate-x-0'
+                    )}
+                  />
+                </button>
+              </div>
             </div>
           </section>
 

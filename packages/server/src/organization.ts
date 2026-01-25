@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { basename, extname, join } from 'node:path';
-import type { SmartOrganizationConfig } from '@usb-manager/shared';
+import type { SmartOrganizationConfig } from '@usb-ingest/shared';
 
 interface FileMetadata {
   year: string;

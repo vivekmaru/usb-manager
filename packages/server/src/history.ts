@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { CopyHistoryEntry } from '@usb-manager/shared';
+import type { CopyHistoryEntry } from '@usb-ingest/shared';
 
 function getHistoryPath(): string {
   const configDir = join(homedir(), '.config', 'usb-manager');

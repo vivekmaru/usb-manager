@@ -35,6 +35,7 @@ export interface Features {
   smartOrganization?: boolean;
   contentDuplicates?: boolean;
   scheduledActions?: boolean;
+  verifyIntegrity?: boolean;
 }
 
 export interface SmartOrganizationConfig {
@@ -93,6 +94,8 @@ export interface CopyProgress {
   totalFiles: number;
   copiedFiles: number;
   skippedFiles: number; // duplicates that were skipped
+  verifiedFiles?: number;
+  failedVerificationFiles?: number;
   totalBytes: number;
   copiedBytes: number;
   currentFile: string | null;
@@ -148,6 +151,7 @@ export interface CopyHistoryFile {
   status: 'copied' | 'skipped' | 'error';
   error?: string;
   hash?: string; // SHA-256 hash if content duplicates feature is enabled
+  verificationStatus?: 'verified' | 'failed' | 'skipped';
 }
 
 // Content-based duplicate types
