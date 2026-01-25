@@ -9,7 +9,7 @@ import type {
   FileWithMatch,
   CopyHistoryEntry,
   CopyHistoryFile,
-} from '@usb-manager/shared';
+} from '@usb-ingest/shared';
 import { isExcluded, loadRules, matchFile } from './rules.js';
 import { addHistoryEntry } from './history.js';
 import { calculateFileHash, isDuplicate } from './duplicates.js';
@@ -164,6 +164,8 @@ export async function* executeCopy(
     totalFiles,
     copiedFiles: 0,
     skippedFiles: 0,
+    verifiedFiles: 0,
+    failedVerificationFiles: 0,
     totalBytes,
     copiedBytes: 0,
     currentFile: null,
@@ -247,9 +249,25 @@ export async function* executeCopy(
 
       await copyFile(file.sourcePath, destPath);
 
-      // Calculate hash if copy history is enabled
-      if (features.copyHistory && features.contentDuplicates) {
+      // Calculate hash if copy history is enabled or verification is needed
+      if ((features.copyHistory && features.contentDuplicates) || features.verifyIntegrity) {
         fileHash = await calculateFileHash(file.sourcePath);
+      }
+
+      let verificationStatus: 'verified' | 'failed' | 'skipped' = 'skipped';
+
+      // Verify integrity if enabled
+      if (features.verifyIntegrity && fileHash) {
+        const destHash = await calculateFileHash(destPath);
+        if (destHash === fileHash) {
+          progress.verifiedFiles = (progress.verifiedFiles || 0) + 1;
+          verificationStatus = 'verified';
+        } else {
+          progress.failedVerificationFiles = (progress.failedVerificationFiles || 0) + 1;
+          verificationStatus = 'failed';
+          // Treat verification failure as an error for this file?
+          // For now just logging it in history and progress
+        }
       }
 
       progress.copiedBytes += sourceStats.size;
@@ -262,6 +280,7 @@ export async function* executeCopy(
           size: sourceStats.size,
           status: 'copied',
           hash: fileHash,
+          verificationStatus,
         });
       }
 

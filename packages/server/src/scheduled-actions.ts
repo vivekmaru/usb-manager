@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { unlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
-import type { ScheduledActionsConfig } from '@usb-manager/shared';
+import type { ScheduledActionsConfig } from '@usb-ingest/shared';
 
 const execAsync = promisify(exec);
 

@@ -1,8 +1,8 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import fastifyStatic from '@fastify/static';
-import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { createReadStream, existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { readdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import type {
@@ -15,7 +15,7 @@ import type {
   UsbDrive,
   CopyHistoryEntry,
   DuplicateGroup,
-} from '@usb-manager/shared';
+} from '@usb-ingest/shared';
 import {
   applyRulesToFiles,
   executeCopy,
@@ -86,6 +86,49 @@ fastify.get('/api/usb', async (): Promise<ApiResponse<UsbDrive>> => {
     };
   }
 });
+
+// Preview file content
+fastify.get<{ Querystring: { path: string } }>(
+  '/api/preview',
+  async (request, reply) => {
+    const { path } = request.query;
+
+    if (!path) {
+      return reply.code(400).send({ error: 'Path required' });
+    }
+
+    // Security check: ensure path is within USB mount path
+    const resolvedPath = resolve(path);
+    const resolvedMountPath = resolve(USB_MOUNT_PATH);
+
+    if (!resolvedPath.startsWith(resolvedMountPath)) {
+      return reply.code(403).send({ error: 'Access denied' });
+    }
+
+    if (!existsSync(resolvedPath)) {
+      return reply.code(404).send({ error: 'File not found' });
+    }
+
+    const ext = resolvedPath.split('.').pop()?.toLowerCase();
+    let contentType = 'application/octet-stream';
+
+    // Simple mime type detection
+    if (['jpg', 'jpeg'].includes(ext!)) contentType = 'image/jpeg';
+    else if (['png'].includes(ext!)) contentType = 'image/png';
+    else if (['gif'].includes(ext!)) contentType = 'image/gif';
+    else if (['webp'].includes(ext!)) contentType = 'image/webp';
+    else if (['svg'].includes(ext!)) contentType = 'image/svg+xml';
+    else if (['pdf'].includes(ext!)) contentType = 'application/pdf';
+    else if (['txt', 'log', 'md', 'json', 'yml', 'yaml', 'xml', 'csv'].includes(ext!)) contentType = 'text/plain';
+    else if (['mp4', 'm4v'].includes(ext!)) contentType = 'video/mp4';
+    else if (['webm'].includes(ext!)) contentType = 'video/webm';
+    else if (['mp3'].includes(ext!)) contentType = 'audio/mpeg';
+    else if (['wav'].includes(ext!)) contentType = 'audio/wav';
+
+    reply.type(contentType);
+    return reply.send(createReadStream(resolvedPath));
+  }
+);
 
 // List files on USB with rule matches
 fastify.get('/api/files', async (): Promise<ApiResponse<FileWithMatch[]>> => {
